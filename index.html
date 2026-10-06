@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Resizer</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --card: #fff;
+    --border: #dddcd6; --accent: #2f6fde; --accent-fg: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --fg: #ececea; --muted: #9a9a94; --card: #20201f;
+            --border: #353532; --accent: #5b8ff0; --accent-fg: #0d0d0c; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 system-ui, -apple-system, sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
+  h1 { font-size: 22px; margin: 0 0 20px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; margin-bottom: 16px;
+  }
+  .drop {
+    display: block; border: 2px dashed var(--border); border-radius: 8px;
+    padding: 28px 16px; text-align: center; color: var(--muted); cursor: pointer;
+  }
+  .drop.over { border-color: var(--accent); color: var(--fg); }
+  .drop input { display: none; }
+  .row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin-top: 16px; }
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  input[type=number], select {
+    width: 120px; padding: 8px 10px; font: inherit; color: var(--fg);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  }
+  .check { display: flex; align-items: center; gap: 6px; font-size: 14px; padding-bottom: 8px; }
+  button {
+    padding: 9px 18px; font: inherit; font-weight: 600; border: 0; border-radius: 6px;
+    background: var(--accent); color: var(--accent-fg); cursor: pointer;
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  .info { font-size: 13px; color: var(--muted); margin-top: 12px; }
+  #preview { max-width: 100%; display: block; margin-top: 12px; border-radius: 6px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Image Resizer</h1>
+
+  <div class="card">
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/*">
+      <span id="dropText">Click to choose an image, or drop one here</span>
+    </label>
+
+    <div class="row">
+      <label class="field">Width (px)
+        <input type="number" id="w" min="1" disabled>
+      </label>
+      <label class="field">Height (px)
+        <input type="number" id="h" min="1" disabled>
+      </label>
+      <label class="check"><input type="checkbox" id="lock" checked> Keep aspect ratio</label>
+    </div>
+
+    <div class="row">
+      <label class="field">Format
+        <select id="fmt">
+          <option value="image/png">PNG</option>
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/webp">WebP</option>
+        </select>
+      </label>
+      <button id="go" disabled>Resize &amp; Download</button>
+    </div>
+
+    <div class="info" id="info"></div>
+  </div>
+
+  <div class="card hidden" id="previewCard">
+    <div class="info" style="margin:0">Preview</div>
+    <img id="preview" alt="Resized preview">
+  </div>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const fileInput = $('file'), drop = $('drop'), w = $('w'), h = $('h');
+  const lock = $('lock'), fmt = $('fmt'), go = $('go'), info = $('info');
+  let img = null, baseName = 'image';
+
+  function load(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    baseName = file.name.replace(/\.[^.]+$/, '');
+    const url = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = () => {
+      img = im;
+      w.value = im.naturalWidth; h.value = im.naturalHeight;
+      w.disabled = h.disabled = go.disabled = false;
+      $('dropText').textContent = file.name;
+      info.textContent = `Original: ${im.naturalWidth} × ${im.naturalHeight} px`;
+      if (file.type === 'image/jpeg') fmt.value = 'image/jpeg';
+      else if (file.type === 'image/webp') fmt.value = 'image/webp';
+      else fmt.value = 'image/png';
+    };
+    im.src = url;
+  }
+
+  fileInput.addEventListener('change', e => load(e.target.files[0]));
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('over');
+    load(e.dataTransfer.files[0]);
+  });
+
+  const ratio = () => img.naturalWidth / img.naturalHeight;
+  w.addEventListener('input', () => {
+    if (img && lock.checked && w.value > 0) h.value = Math.max(1, Math.round(w.value / ratio()));
+  });
+  h.addEventListener('input', () => {
+    if (img && lock.checked && h.value > 0) w.value = Math.max(1, Math.round(h.value * ratio()));
+  });
+
+  go.addEventListener('click', () => {
+    const W = parseInt(w.value, 10), H = parseInt(h.value, 10);
+    if (!img || !(W > 0) || !(H > 0)) { info.textContent = 'Enter a width and height greater than 0.'; return; }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if (fmt.value === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); } // JPEG has no alpha
+    ctx.drawImage(img, 0, 0, W, H);
+
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      $('preview').src = url;
+      $('previewCard').classList.remove('hidden');
+      const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[fmt.value];
+      const a = document.createElement('a');
+      a.href = url; a.download = `${baseName}_${W}x${H}.${ext}`;
+      a.click();
+      info.textContent = `Saved ${a.download} (${(blob.size / 1024).toFixed(1)} KB)`;
+    }, fmt.value, 0.92);
+  });
+</script>
+</body>
+</html>
