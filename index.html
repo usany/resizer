@@ -88,9 +88,9 @@
 </main>
 
 <script>
-  const $ = id => document.getElementById(id);
-  const fileInput = $('file'), drop = $('drop'), w = $('w'), h = $('h');
-  const lock = $('lock'), fmt = $('fmt'), go = $('go'), info = $('info');
+  const getElement = id => document.getElementById(id);
+  const fileInput = getElement('file'), drop = getElement('drop'), w = getElement('w'), h = getElement('h');
+  const lock = getElement('lock'), fmt = getElement('fmt'), go = getElement('go'), info = getElement('info');
   let img = null, baseName = 'image';
 
   function load(file) {
@@ -102,7 +102,7 @@
       img = im;
       w.value = im.naturalWidth; h.value = im.naturalHeight;
       w.disabled = h.disabled = go.disabled = false;
-      $('dropText').textContent = file.name;
+      getElement('dropText').textContent = file.name;
       info.textContent = `Original: ${im.naturalWidth} × ${im.naturalHeight} px`;
       if (file.type === 'image/jpeg') fmt.value = 'image/jpeg';
       else if (file.type === 'image/webp') fmt.value = 'image/webp';
@@ -141,8 +141,8 @@
 
     canvas.toBlob(blob => {
       const url = URL.createObjectURL(blob);
-      $('preview').src = url;
-      $('previewCard').classList.remove('hidden');
+      getElement('preview').src = url;
+      getElement('previewCard').classList.remove('hidden');
       const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[fmt.value];
       const a = document.createElement('a');
       a.href = url; a.download = `${baseName}_${W}x${H}.${ext}`;
